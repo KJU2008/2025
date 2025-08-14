@@ -12,7 +12,7 @@ st.markdown("""
     <style>
     body {
         background: linear-gradient(135deg, #FFD3A5, #FD6585);
-        color: white;
+        color: blue;
         font-family: 'Pretendard', sans-serif;
     }
     .stSelectbox label {
