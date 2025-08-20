@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import date
 
 # -----------------------------
@@ -36,7 +35,6 @@ def home():
 # -----------------------------
 def daily_log():
     st.title("📝 일일 기록")
-
     today = date.today().strftime("%Y-%m-%d")
     st.write(f"오늘: {today}")
 
@@ -64,68 +62,38 @@ def daily_log():
 # -----------------------------
 def statistics():
     st.title("📊 내 건강 통계")
-
     if st.session_state.logs.empty:
         st.warning("아직 기록이 없습니다. 먼저 일일 기록을 작성해주세요!")
         return
 
     df = st.session_state.logs.copy()
     df["sleep"] = pd.to_numeric(df["sleep"], errors="coerce")
+    st.write(f"이번 기간 평균 수면 시간: {df['sleep'].mean():.1f} 시간")
 
-    # 평균 수면
-    avg_sleep = df["sleep"].mean()
-    st.write(f"이번 기간 평균 수면 시간: {avg_sleep:.1f} 시간")
-
-    # 수면 그래프
+    # Streamlit 기본 차트 사용
     st.subheader("수면 시간 변화")
-    fig, ax = plt.subplots()
-    ax.plot(df["date"], df["sleep"], marker="o", linestyle="-")
-    ax.set_ylabel("수면 시간 (시간)")
-    ax.set_xlabel("날짜")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    st.line_chart(df.set_index("date")["sleep"])
 
-    # 스트레스 변화
     st.subheader("스트레스 변화 추세")
     mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4}
     df["mood_score"] = df["mood"].map(mood_map)
+    st.line_chart(df.set_index("date")["mood_score"])
 
-    fig2, ax2 = plt.subplots()
-    ax2.plot(df["date"], df["mood_score"], marker="o", linestyle="-", color="orange")
-    ax2.set_ylabel("스트레스 지수 (1=좋음, 4=나쁨)")
-    ax2.set_xlabel("날짜")
-    plt.xticks(rotation=45)
-    st.pyplot(fig2)
-
-    # 증상 Top 3
     st.subheader("자주 기록된 증상 Top 3")
     all_symptoms = ",".join(df["symptoms"].dropna()).split(",")
     symptom_counts = pd.Series(all_symptoms).value_counts().head(3)
-
-    fig3, ax3 = plt.subplots()
-    symptom_counts.plot(kind="bar", ax=ax3)
-    ax3.set_ylabel("횟수")
-    st.pyplot(fig3)
-
-    # 피드백 메시지
-    st.subheader("📝 건강 피드백")
-    if avg_sleep < 6:
-        st.warning("이번 달 수면이 평균 6시간 미만 → 수면 부족 경고 😴")
-    if df["mood_score"].mean() > 2.5:
-        st.info("스트레스 지수 상승 → 운동이나 산책 추천 🏃")
+    st.bar_chart(symptom_counts)
 
 # -----------------------------
 # 건강 이력
 # -----------------------------
 def health_profile():
     st.title("📖 나의 건강 이력")
-
     st.subheader("📏 신체 정보")
     height = st.number_input("키 (cm)", value=st.session_state.profile["height"] or 160.0)
     weight = st.number_input("몸무게 (kg)", value=st.session_state.profile["weight"] or 50.0)
     bmi = weight / ((height / 100) ** 2) if height > 0 else 0
     st.write(f"👉 BMI: {bmi:.1f}")
-
     st.session_state.profile["height"] = height
     st.session_state.profile["weight"] = weight
 
@@ -136,28 +104,21 @@ def health_profile():
     st.write(st.session_state.profile["vaccines"])
 
     st.subheader("🩺 증상 이력")
-    if st.session_state.logs.empty:
-        st.info("아직 증상 기록이 없습니다.")
-    else:
-        st.dataframe(st.session_state.logs[["date", "symptoms"]])
+    st.dataframe(st.session_state.logs[["date", "symptoms"]])
 
 # -----------------------------
 # 도움말
 # -----------------------------
 def health_tips():
     st.title("💡 건강 관리 팁")
-
     st.subheader("스트레스 완화법")
     st.write("- 깊게 호흡하기, 스트레칭, 가벼운 산책")
-
     st.subheader("두통/복통 대처법")
     st.write("- 두통: 조용한 곳에서 휴식, 수분 섭취")
     st.write("- 복통: 따뜻한 찜질, 충분한 수분 섭취")
-
     st.subheader("수면 습관 개선 팁")
     st.write("- 규칙적인 수면 시간 유지")
     st.write("- 자기 전 스마트폰 사용 줄이기")
-
     st.subheader("보건 지식 코너")
     st.info("실제 간호사가 환자 건강을 관리하듯, 학생도 스스로 건강을 기록하고 관리할 수 있어요!")
 
@@ -165,7 +126,6 @@ def health_tips():
 # 메인 실행
 # -----------------------------
 menu = st.sidebar.radio("메뉴 선택", ["홈", "일일 기록", "건강 통계", "건강 이력", "도움말"])
-
 if menu == "홈":
     home()
 elif menu == "일일 기록":
