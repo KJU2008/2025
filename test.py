@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, timedelta
 
 # -----------------------------
 # 기본 설정
@@ -25,10 +25,24 @@ def home():
     if not today_log.empty:
         log = today_log.iloc[0]
         st.success(
-            f"오늘 기록 현황: 수면 {log['sleep']}시간 / 스트레스 {log['mood']} / 증상 {log['symptoms']}"
+            f"오늘 기록 현황: 수면 {log['sleep']}시간 / 기분 {log['mood']} / 증상 {log['symptoms']}"
         )
     else:
         st.info("오늘 기록이 아직 없습니다. 👉 '일일 기록'에서 작성해보세요!")
+
+    # 주간 통계
+    st.subheader("이번 주 건강 요약")
+    week_ago = (date.today() - timedelta(days=6)).strftime("%Y-%m-%d")
+    week_logs = st.session_state.logs[st.session_state.logs["date"] >= week_ago]
+    if not week_logs.empty:
+        week_logs["sleep"] = pd.to_numeric(week_logs["sleep"], errors="coerce")
+        avg_sleep = week_logs["sleep"].mean()
+        st.write(f"이번 주 평균 수면 시간: {avg_sleep:.1f} 시간")
+        mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4}
+        week_logs["mood_score"] = week_logs["mood"].map(mood_map)
+        avg_mood = week_logs["mood_score"].mean()
+        mood_display = "🙂" if avg_mood < 1.5 else "😐" if avg_mood < 2.5 else "😢" if avg_mood < 3.5 else "😡"
+        st.write(f"이번 주 평균 기분: {mood_display}")
 
 # -----------------------------
 # 일일 기록
@@ -44,7 +58,11 @@ def daily_log():
     memo = st.text_area("메모")
 
     if st.button("저장하기"):
-        st.session_state.logs = st.session_state.logs[st.session_state.logs["date"] != today]
+        if not st.session_state.logs[st.session_state.logs["date"] == today].empty:
+            if not st.confirm("오늘 기록이 이미 있습니다. 덮어쓰시겠습니까?"):
+                return
+            st.session_state.logs = st.session_state.logs[st.session_state.logs["date"] != today]
+
         st.session_state.logs = pd.concat(
             [
                 st.session_state.logs,
@@ -68,17 +86,21 @@ def statistics():
 
     df = st.session_state.logs.copy()
     df["sleep"] = pd.to_numeric(df["sleep"], errors="coerce")
-    st.write(f"이번 기간 평균 수면 시간: {df['sleep'].mean():.1f} 시간")
+    st.write(f"전체 평균 수면 시간: {df['sleep'].mean():.1f} 시간")
 
-    # Streamlit 기본 차트 사용
+    # 수면 시간 변화
     st.subheader("수면 시간 변화")
-    st.line_chart(df.set_index("date")["sleep"])
+    sleep_chart = df.set_index("date")["sleep"]
+    sleep_color = sleep_chart.apply(lambda x: "red" if x < 6 else "green" if x >= 8 else "orange")
+    st.bar_chart(sleep_chart)
 
+    # 스트레스 변화
     st.subheader("스트레스 변화 추세")
     mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4}
     df["mood_score"] = df["mood"].map(mood_map)
     st.line_chart(df.set_index("date")["mood_score"])
 
+    # 자주 기록된 증상
     st.subheader("자주 기록된 증상 Top 3")
     all_symptoms = ",".join(df["symptoms"].dropna()).split(",")
     symptom_counts = pd.Series(all_symptoms).value_counts().head(3)
@@ -100,11 +122,12 @@ def health_profile():
     st.subheader("💉 예방접종 기록")
     vaccine = st.text_input("예방접종 추가")
     if st.button("추가하기"):
-        st.session_state.profile["vaccines"].append(vaccine)
+        if vaccine and vaccine not in st.session_state.profile["vaccines"]:
+            st.session_state.profile["vaccines"].append(vaccine)
     st.write(st.session_state.profile["vaccines"])
 
     st.subheader("🩺 증상 이력")
-    st.dataframe(st.session_state.logs[["date", "symptoms"]])
+    st.dataframe(st.session_state.logs.sort_values("date", ascending=False)[["date", "symptoms"]])
 
 # -----------------------------
 # 도움말
