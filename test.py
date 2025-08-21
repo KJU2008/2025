@@ -1,16 +1,30 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from datetime import date, timedelta
+import os
 
 # -----------------------------
 # 기본 설정
 # -----------------------------
 st.set_page_config(page_title="My Health Diary", layout="wide")
 
+# -----------------------------
+# 데이터 로드 / 초기화
+# -----------------------------
+DATA_FILE = "health_logs.csv"
+
 if "logs" not in st.session_state:
-    st.session_state.logs = pd.DataFrame(columns=["date", "sleep", "mood", "symptoms", "memo"])
+    if os.path.exists(DATA_FILE):
+        st.session_state.logs = pd.read_csv(DATA_FILE)
+    else:
+        st.session_state.logs = pd.DataFrame(columns=["date", "sleep", "mood", "symptoms", "memo"])
+
 if "profile" not in st.session_state:
     st.session_state.profile = {"height": None, "weight": None, "vaccines": []}
+
+def save_logs():
+    st.session_state.logs.to_csv(DATA_FILE, index=False)
 
 # -----------------------------
 # 홈 화면
@@ -31,13 +45,14 @@ def home():
         st.info("오늘 기록이 아직 없습니다. 👉 '일일 기록'에서 작성해보세요!")
 
     # 주간 통계
-    st.subheader("이번 주 건강 요약")
+    st.subheader("📅 이번 주 건강 요약")
     week_ago = (date.today() - timedelta(days=6)).strftime("%Y-%m-%d")
     week_logs = st.session_state.logs[st.session_state.logs["date"] >= week_ago]
     if not week_logs.empty:
         week_logs["sleep"] = pd.to_numeric(week_logs["sleep"], errors="coerce")
         avg_sleep = week_logs["sleep"].mean()
         st.write(f"이번 주 평균 수면 시간: {avg_sleep:.1f} 시간")
+
         mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4}
         week_logs["mood_score"] = week_logs["mood"].map(mood_map)
         avg_mood = week_logs["mood_score"].mean()
@@ -59,7 +74,9 @@ def daily_log():
 
     if st.button("저장하기"):
         if not st.session_state.logs[st.session_state.logs["date"] == today].empty:
-            if not st.confirm("오늘 기록이 이미 있습니다. 덮어쓰시겠습니까?"):
+            confirm = st.radio("오늘 기록이 이미 있습니다. 덮어쓸까요?", ["예", "아니오"], index=1)
+            if confirm == "아니오":
+                st.warning("저장을 취소했습니다.")
                 return
             st.session_state.logs = st.session_state.logs[st.session_state.logs["date"] != today]
 
@@ -73,6 +90,7 @@ def daily_log():
             ],
             ignore_index=True,
         )
+        save_logs()
         st.success("오늘 기록 완료 ✅")
 
 # -----------------------------
@@ -86,13 +104,19 @@ def statistics():
 
     df = st.session_state.logs.copy()
     df["sleep"] = pd.to_numeric(df["sleep"], errors="coerce")
+
     st.write(f"전체 평균 수면 시간: {df['sleep'].mean():.1f} 시간")
 
-    # 수면 시간 변화
+    # 수면 시간 변화 (Altair 시각화)
     st.subheader("수면 시간 변화")
-    sleep_chart = df.set_index("date")["sleep"]
-    sleep_color = sleep_chart.apply(lambda x: "red" if x < 6 else "green" if x >= 8 else "orange")
-    st.bar_chart(sleep_chart)
+    df["sleep_color"] = df["sleep"].apply(lambda x: "부족(빨강)" if x < 6 else "충분(초록)" if x >= 8 else "보통(주황)")
+    chart = alt.Chart(df).mark_bar().encode(
+        x="date",
+        y="sleep",
+        color=alt.Color("sleep_color", scale=alt.Scale(domain=["부족(빨강)", "보통(주황)", "충분(초록)"],
+                                                      range=["red", "orange", "green"]))
+    )
+    st.altair_chart(chart, use_container_width=True)
 
     # 스트레스 변화
     st.subheader("스트레스 변화 추세")
@@ -126,8 +150,8 @@ def health_profile():
             st.session_state.profile["vaccines"].append(vaccine)
     st.write(st.session_state.profile["vaccines"])
 
-    st.subheader("🩺 증상 이력")
-    st.dataframe(st.session_state.logs.sort_values("date", ascending=False)[["date", "symptoms"]])
+    st.subheader("🩺 증상/메모 이력")
+    st.dataframe(st.session_state.logs.sort_values("date", ascending=False)[["date", "symptoms", "memo"]])
 
 # -----------------------------
 # 도움말
