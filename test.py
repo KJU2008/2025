@@ -7,7 +7,34 @@ import os
 # -----------------------------
 # 기본 설정
 # -----------------------------
-st.set_page_config(page_title="My Health Diary", layout="wide")
+st.set_page_config(page_title="My Health Diary 🌱", layout="wide")
+
+# 파스텔톤 컬러 CSS 적용
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #fdfcfb;
+    }
+    .stApp {
+        background: linear-gradient(180deg, #fdfcfb 0%, #f6f9f9 100%);
+    }
+    h1, h2, h3 {
+        color: #2a4d4e;
+    }
+    .stButton>button {
+        background-color: #a8e6cf;
+        color: black;
+        border-radius: 10px;
+    }
+    .stButton>button:hover {
+        background-color: #ffd3b6;
+        color: black;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # -----------------------------
 # 데이터 로드 / 초기화
@@ -22,6 +49,9 @@ if "logs" not in st.session_state:
 
 if "profile" not in st.session_state:
     st.session_state.profile = {"height": None, "weight": None, "vaccines": []}
+
+if "goal" not in st.session_state:
+    st.session_state.goal = {"sleep_goal": 7.0}  # 기본 목표: 7시간 수면
 
 def save_logs():
     st.session_state.logs.to_csv(DATA_FILE, index=False)
@@ -53,9 +83,21 @@ def home():
         avg_sleep = week_logs["sleep"].mean()
         st.write(f"이번 주 평균 수면 시간: {avg_sleep:.1f} 시간")
 
+        # 목표 달성률
+        goal = st.session_state.goal["sleep_goal"]
+        achievement = (week_logs["sleep"] >= goal).sum() / len(week_logs) * 100
+        st.progress(int(achievement))
+        st.write(f"👉 수면 목표({goal}시간) 달성률: {achievement:.0f}%")
+
+        # 피드백
+        st.subheader("📌 자기 분석 피드백")
+        if avg_sleep < goal:
+            st.warning(f"이번 주는 평균 수면 시간이 {avg_sleep:.1f}시간으로 부족했어요. 주말에 휴식을 더 취해보세요!")
+        else:
+            st.success(f"이번 주는 평균 수면 시간이 {avg_sleep:.1f}시간으로 충분해요! 👍 앞으로도 잘 유지해봐요.")
+
         mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4, "🤩": 5, "😴": 6, "😰": 7, "😍": 8, "🥱": 9, "😭": 10}
         week_logs["mood_score"] = week_logs["mood"].map(mood_map)
-        avg_mood = week_logs["mood_score"].mean()
         mood_display = week_logs["mood"].mode()[0]  # 가장 많이 선택된 기분 표시
         st.write(f"이번 주 대표 기분: {mood_display}")
 
@@ -116,6 +158,11 @@ def statistics():
 
     st.write(f"전체 평균 수면 시간: {df['sleep'].mean():.1f} 시간")
 
+    # 목표 성취율
+    goal = st.session_state.goal["sleep_goal"]
+    achievement = (df["sleep"] >= goal).sum() / len(df) * 100
+    st.write(f"👉 전체 기간 수면 목표({goal}시간) 달성률: {achievement:.0f}%")
+
     # 수면 시간 변화 (Altair 막대그래프)
     st.subheader("수면 시간 변화")
     df["sleep_color"] = df["sleep"].apply(lambda x: "부족(빨강)" if x < 6 else "충분(초록)" if x >= 8 else "보통(주황)")
@@ -123,7 +170,7 @@ def statistics():
         x="date",
         y="sleep",
         color=alt.Color("sleep_color", scale=alt.Scale(domain=["부족(빨강)", "보통(주황)", "충분(초록)"],
-                                                      range=["red", "orange", "green"]))
+                                                      range=["#ffaaa5", "#ffd3b6", "#a8e6cf"]))
     )
     st.altair_chart(chart, use_container_width=True)
 
@@ -181,6 +228,9 @@ def health_tips():
 # 메인 실행
 # -----------------------------
 menu = st.sidebar.radio("메뉴 선택", ["홈", "일일 기록", "건강 통계", "건강 이력", "도움말"])
+st.sidebar.markdown("### 🎯 건강 목표 설정")
+st.session_state.goal["sleep_goal"] = st.sidebar.number_input("수면 목표 (시간)", min_value=4.0, max_value=12.0, step=0.5, value=st.session_state.goal["sleep_goal"])
+
 if menu == "홈":
     home()
 elif menu == "일일 기록":
