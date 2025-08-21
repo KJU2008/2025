@@ -176,7 +176,7 @@ def statistics():
     st.altair_chart(chart, use_container_width=True)
 
     # 스트레스 변화 추세 (표)
-    st.subheader("스트레스 변화 추세 (표)")
+    st.subheader("스트레스 변화 추세")
     mood_df = df[["date", "mood"]].sort_values("date", ascending=False)
     st.table(mood_df)  # 🟢 다시 추가
 
