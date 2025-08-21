@@ -53,45 +53,54 @@ def home():
         avg_sleep = week_logs["sleep"].mean()
         st.write(f"이번 주 평균 수면 시간: {avg_sleep:.1f} 시간")
 
-        mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4}
+        mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4, "🤩": 5, "😴": 6, "😰": 7, "😍": 8, "🥱": 9, "😭": 10}
         week_logs["mood_score"] = week_logs["mood"].map(mood_map)
         avg_mood = week_logs["mood_score"].mean()
-        mood_display = "🙂" if avg_mood < 1.5 else "😐" if avg_mood < 2.5 else "😢" if avg_mood < 3.5 else "😡"
-        st.write(f"이번 주 평균 기분: {mood_display}")
+        mood_display = week_logs["mood"].mode()[0]  # 가장 많이 선택된 기분 표시
+        st.write(f"이번 주 대표 기분: {mood_display}")
 
 # -----------------------------
 # 일일 기록
 # -----------------------------
 def daily_log():
     st.title("📝 일일 기록")
-    today = date.today().strftime("%Y-%m-%d")
-    st.write(f"오늘: {today}")
+
+    # 날짜 선택 가능
+    selected_date = st.date_input("기록할 날짜 선택", value=date.today())
+    record_date = selected_date.strftime("%Y-%m-%d")
 
     sleep = st.number_input("수면 시간 (시간)", min_value=0.0, max_value=24.0, step=0.5)
-    mood = st.selectbox("오늘 기분/스트레스", ["🙂", "😐", "😢", "😡"])
-    symptoms = st.multiselect("신체 증상", ["두통", "복통", "피로", "없음"])
+
+    # 기분/스트레스 이모티콘 확장
+    mood_options = ["🙂", "😐", "😢", "😡", "🤩", "😴", "😰", "😍", "🥱", "😭"]
+    mood = st.selectbox("오늘 기분/스트레스", mood_options)
+
+    # 증상 선택지 확장
+    symptom_options = ["두통", "복통", "피로", "감기", "기침", "콧물", "어지럼증", "근육통", "없음"]
+    symptoms = st.multiselect("신체 증상", symptom_options)
+
     memo = st.text_area("메모")
 
     if st.button("저장하기"):
-        if not st.session_state.logs[st.session_state.logs["date"] == today].empty:
-            confirm = st.radio("오늘 기록이 이미 있습니다. 덮어쓸까요?", ["예", "아니오"], index=1)
+        if not st.session_state.logs[st.session_state.logs["date"] == record_date].empty:
+            confirm = st.radio("이미 해당 날짜 기록이 있습니다. 덮어쓸까요?", ["예", "아니오"], index=1)
             if confirm == "아니오":
                 st.warning("저장을 취소했습니다.")
                 return
-            st.session_state.logs = st.session_state.logs[st.session_state.logs["date"] != today]
+            st.session_state.logs = st.session_state.logs[st.session_state.logs["date"] != record_date]
 
         st.session_state.logs = pd.concat(
             [
                 st.session_state.logs,
                 pd.DataFrame(
-                    [[today, sleep, mood, ",".join(symptoms), memo]],
+                    [[record_date, sleep, mood, ",".join(symptoms), memo]],
                     columns=["date", "sleep", "mood", "symptoms", "memo"],
                 ),
             ],
             ignore_index=True,
         )
         save_logs()
-        st.success("오늘 기록 완료 ✅")
+        st.success(f"{record_date} 기록 완료 ✅")
 
 # -----------------------------
 # 건강 통계
@@ -107,7 +116,7 @@ def statistics():
 
     st.write(f"전체 평균 수면 시간: {df['sleep'].mean():.1f} 시간")
 
-    # 수면 시간 변화 (Altair 시각화)
+    # 수면 시간 변화 (Altair 막대그래프)
     st.subheader("수면 시간 변화")
     df["sleep_color"] = df["sleep"].apply(lambda x: "부족(빨강)" if x < 6 else "충분(초록)" if x >= 8 else "보통(주황)")
     chart = alt.Chart(df).mark_bar().encode(
@@ -118,11 +127,10 @@ def statistics():
     )
     st.altair_chart(chart, use_container_width=True)
 
-    # 스트레스 변화
-    st.subheader("스트레스 변화 추세")
-    mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4}
-    df["mood_score"] = df["mood"].map(mood_map)
-    st.line_chart(df.set_index("date")["mood_score"])
+    # 스트레스 변화 (표 형태 + 이모티콘 그대로 표시)
+    st.subheader("스트레스 변화 추세 (표)")
+    mood_df = df[["date", "mood"]].sort_values("date", ascending=False)
+    st.table(mood_df)
 
     # 자주 기록된 증상
     st.subheader("자주 기록된 증상 Top 3")
