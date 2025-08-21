@@ -96,6 +96,7 @@ def home():
         else:
             st.success(f"이번 주는 평균 수면 시간이 {avg_sleep:.1f}시간으로 충분해요! 👍 앞으로도 잘 유지해봐요.")
 
+        # 대표 기분
         mood_map = {"🙂": 1, "😐": 2, "😢": 3, "😡": 4, "🤩": 5, "😴": 6, "😰": 7, "😍": 8, "🥱": 9, "😭": 10}
         week_logs["mood_score"] = week_logs["mood"].map(mood_map)
         mood_display = week_logs["mood"].mode()[0]  # 가장 많이 선택된 기분 표시
@@ -113,11 +114,11 @@ def daily_log():
 
     sleep = st.number_input("수면 시간 (시간)", min_value=0.0, max_value=24.0, step=0.5)
 
-    # 기분/스트레스 이모티콘 확장
+    # 기분/스트레스 이모티콘
     mood_options = ["🙂", "😐", "😢", "😡", "🤩", "😴", "😰", "😍", "🥱", "😭"]
     mood = st.selectbox("오늘 기분/스트레스", mood_options)
 
-    # 증상 선택지 확장
+    # 증상 선택지
     symptom_options = ["두통", "복통", "피로", "감기", "기침", "콧물", "어지럼증", "근육통", "없음"]
     symptoms = st.multiselect("신체 증상", symptom_options)
 
@@ -174,10 +175,10 @@ def statistics():
     )
     st.altair_chart(chart, use_container_width=True)
 
-    # 스트레스 변화 (표 형태 + 이모티콘 그대로 표시)
+    # 스트레스 변화 추세 (표)
     st.subheader("스트레스 변화 추세 (표)")
     mood_df = df[["date", "mood"]].sort_values("date", ascending=False)
-    st.table(mood_df)
+    st.table(mood_df)  # 🟢 다시 추가
 
     # 자주 기록된 증상
     st.subheader("자주 기록된 증상 Top 3")
